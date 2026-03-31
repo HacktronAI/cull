@@ -815,13 +815,19 @@ def main() -> None:
     _tprint(bold(f"━━━ cull: searching for {labels} ━━━"))
 
     all_findings: list[Finding] = []
+    has_other_source = (
+        args.github_org or args.docker or args.images
+        or args.gcr_project or args.gar_repo
+    )
+    scan_dirs = args.dirs or (None if has_other_source else ["."])
 
     for target in targets:
         pkg, bad_version = target.name, target.version
         print_header(f"▸ {target.label}")
 
-        print_header("  LOCAL DIRECTORIES")
-        all_findings.extend(scan_local(args.dirs or ["."], pkg, bad_version))
+        if scan_dirs:
+            print_header("  LOCAL DIRECTORIES")
+            all_findings.extend(scan_local(scan_dirs, pkg, bad_version))
 
         if args.github_token and args.github_org:
             print_header("  GITHUB")
