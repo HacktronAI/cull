@@ -464,6 +464,7 @@ def scan_github(
     auth = {"Authorization": f"Bearer {token}"}
 
     for lock_file in LOCK_FILES:
+        _tprint(f"  {dim('searching')} {dim(lock_file)}…")
         q = urllib.request.quote(f"{pkg} filename:{lock_file} org:{org}")
         data = http_get(
             f"https://api.github.com/search/code?q={q}&per_page=100",

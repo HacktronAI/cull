@@ -6,7 +6,7 @@ Find compromised npm packages across your infrastructure.
 python3 cull.py axios@1.14.1 axios@0.30.4 plain-crypto-js
 ```
 
-Checks lock files (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`), `node_modules`, GitHub code search, and Docker image layers (legacy + OCI). Version-aware — distinguishes compromised versions from safe pins. Exit code `1` if found, `0` otherwise.
+Checks lock files (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`), `node_modules`, GitHub code search, and Docker image layers (legacy + OCI). Version-aware — distinguishes compromised versions from safe pins. Exit code `1` if found, `0` otherwise.
 
 ## Scan targets
 
