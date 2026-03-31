@@ -1,19 +1,31 @@
 # cull
 
-Find compromised npm packages across your infrastructure.
+Find compromised npm packages across your infrastructure. Only Python stdlib, no dependencies.
+
+## Install
 
 ```bash
-python3 cull.py axios@1.14.1 axios@0.30.4 plain-crypto-js
+git clone https://github.com/HacktronAI/cull.git
+cd cull
+python3 -m pip install .
 ```
 
-Checks lock files (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`), `node_modules`, GitHub code search, and Docker image layers (legacy + OCI). Version-aware — distinguishes compromised versions from safe pins. Exit code `1` if found, `0` otherwise.
+We deliberately do not publish to PyPI to avoid creating another supply-chain distribution point for a security tool. Install from a reviewed git clone instead.
+
+## Usage
+
+```bash
+cull axios@1.14.1 axios@0.30.4 plain-crypto-js
+```
+
+Checks lock files (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`), `node_modules`, GitHub code search, and Docker image layers (legacy + OCI). Version-aware — distinguishes compromised versions from safe pins. Exit code `0` when clean, `1` when a compromised package is found, and `2` when the scan could not complete reliably.
 
 ## Scan targets
 
 ### Local directories
 
 ```bash
-python3 cull.py axios@1.14.1 --dirs ~/projects/app1 ~/projects/app2
+cull axios@1.14.1 --dirs ~/projects/app1 ~/projects/app2
 ```
 
 Default: current directory.
@@ -22,7 +34,7 @@ Default: current directory.
 
 ```bash
 export GITHUB_TOKEN=ghp_...
-python3 cull.py axios@1.14.1 --github-org myorg
+cull axios@1.14.1 --github-org myorg
 ```
 
 Searches lock files via [code search API](https://docs.github.com/en/rest/search/search#search-code). Token can also be passed via `--github-token`.
@@ -32,8 +44,8 @@ Searches lock files via [code search API](https://docs.github.com/en/rest/search
 ### Docker images
 
 ```bash
-python3 cull.py axios@1.14.1 --docker           # all local images
-python3 cull.py axios@1.14.1 --images app:latest # specific images
+cull axios@1.14.1 --docker            # all local images
+cull axios@1.14.1 --images app:latest # specific images
 ```
 
 Requires `docker` CLI. Remote images are auto-pulled; use `--no-pull` to skip.
@@ -41,19 +53,21 @@ Requires `docker` CLI. Remote images are auto-pulled; use `--no-pull` to skip.
 ### Google Cloud
 
 ```bash
-python3 cull.py axios@1.14.1 --gar-repo us-central1-docker.pkg.dev/proj/repo  # Artifact Registry
-python3 cull.py axios@1.14.1 --gcr-project my-project                         # Container Registry (legacy)
+cull axios@1.14.1 --gar-repo us-central1-docker.pkg.dev/proj/repo  # Artifact Registry
+cull axios@1.14.1 --gcr-project my-project                         # Container Registry (legacy)
 ```
 
 Requires `gcloud` CLI with `gcloud auth login` and `gcloud auth configure-docker REGION-docker.pkg.dev`.
 
 ## Requirements
 
-Python 3.9+. Optional CLIs: `docker`, `gcloud` — scanners skip gracefully if missing.
+Python 3.9+. Optional CLIs: `docker`, `gcloud`. If you request a scan target whose CLI is missing or whose backend calls fail, `cull` reports an error and exits non-zero instead of silently treating that target as clean.
 
 ## Security
 
-Stdlib only — nothing to supply-chain. External CLIs invoked only when their flags are used. Images are exported via `docker save` / `docker pull` — never `docker run`.
+We intentionally do not publish this to PyPI. The goal is to avoid creating another supply-chain distribution point for a security tool. Install from a reviewed git clone instead.
+
+Stdlib only — nothing else to supply-chain. External CLIs invoked only when their flags are used. Images are exported via `docker save` / `docker pull` — never `docker run`.
 
 ## Contributing
 
