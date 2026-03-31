@@ -133,23 +133,28 @@ class Target:
         return f"{self.name}@{self.version}" if self.version else self.name
 
 
+def _clean_version(v: str) -> str | None:
+    cleaned = v.lstrip("^~>=<v")
+    return cleaned or None
+
+
 def parse_pkg_arg(raw: str) -> Target:
     """Parse 'axios@1.14.1' or '@nestjs/axios@4.0.0' into Target(name, version)."""
     if raw.startswith("@"):
         parts = raw[1:].split("/", 1)
         if len(parts) < 2:
             return Target(raw, None)
-            
+
         scope, rest = parts
         if "@" not in rest:
             return Target(raw, None)
-            
+
         name_part, version = rest.rsplit("@", 1)
-        return Target(f"@{scope}/{name_part}", version)
+        return Target(f"@{scope}/{name_part}", _clean_version(version))
 
     if "@" in raw:
         name, version = raw.rsplit("@", 1)
-        return Target(name, version)
+        return Target(name, _clean_version(version))
 
     return Target(raw, None)
 
@@ -232,9 +237,13 @@ def _versions_from_yarn_lock(content: str, pkg: str) -> set[str]:
     return versions
 
 
+def _strip_jsonc_trailing_commas(text: str) -> str:
+    return re.sub(r",\s*([}\]])", r"\1", text)
+
+
 def _versions_from_bun_lock(content: str, pkg: str) -> set[str]:
     try:
-        data = json.loads(content)
+        data = json.loads(_strip_jsonc_trailing_commas(content))
     except (json.JSONDecodeError, ValueError):
         return set()
 
@@ -520,8 +529,7 @@ def _is_layer_entry(member: tarfile.TarInfo) -> bool:
 def _scan_layer(
     layer: tarfile.TarFile,
     image: str,
-    pkg: str,
-    bad_version: str | None,
+    targets: list[Target],
     findings: list[Finding],
 ) -> None:
     for entry in layer:
@@ -533,7 +541,13 @@ def _scan_layer(
         name = entry.name
         basename = os.path.basename(name)
 
-        if f"node_modules/{pkg}/package.json" in name:
+        matched_target: Target | None = None
+        for t in targets:
+            if f"node_modules/{t.name}/package.json" in name:
+                matched_target = t
+                break
+
+        if matched_target:
             f = layer.extractfile(entry)
             if not f:
                 continue
@@ -543,12 +557,13 @@ def _scan_layer(
             except (json.JSONDecodeError, ValueError):
                 installed = ""
 
-            loc = f"{image} → node_modules/{pkg}"
-            if not bad_version:
+            loc = f"{image} → node_modules/{matched_target.name}"
+            bad = matched_target.version
+            if not bad:
                 print_found(loc, installed)
                 findings.append(Finding("docker", loc, "found", installed))
-            elif installed == bad_version:
-                print_found(loc, f"{pkg}@{installed}")
+            elif installed == bad:
+                print_found(loc, f"{matched_target.name}@{installed}")
                 findings.append(Finding("docker", loc, "found", installed))
             elif installed:
                 print_pinned(loc, installed)
@@ -562,11 +577,12 @@ def _scan_layer(
         if not f:
             continue
         content = f.read(MAX_FILE_BYTES).decode(errors="replace")
-        result = _check_content(
-            content, pkg, bad_version, "docker", f"{image} → {name}", basename,
-        )
-        if result:
-            findings.append(result)
+        for t in targets:
+            result = _check_content(
+                content, t.name, t.version, "docker", f"{image} → {name}", basename,
+            )
+            if result:
+                findings.append(result)
 
 
 def _ensure_available(image: str, *, auto_pull: bool = True) -> bool:
@@ -585,13 +601,13 @@ def _short_image(image: str) -> str:
 
 
 def _scan_single_image(
-    image: str, pkg: str, bad_version: str | None, *, auto_pull: bool = True,
+    image: str, targets: list[Target], *, auto_pull: bool = True,
 ) -> list[Finding]:
     findings: list[Finding] = []
     scanned = False
 
     if not _ensure_available(image, auto_pull=auto_pull):
-        reason = "not pulled (use without --no-pull)" if not auto_pull else "pull failed"
+        reason = "not pulled (use without --no-pull)" if not auto_pull else "not available locally"
         print_skip(f"{reason}: {image}")
         return findings
 
@@ -617,7 +633,7 @@ def _scan_single_image(
                 try:
                     with tarfile.open(fileobj=layer_file, mode="r|*") as layer:
                         scanned = True
-                        _scan_layer(layer, image, pkg, bad_version, findings)
+                        _scan_layer(layer, image, targets, findings)
                 except tarfile.TarError:
                     continue
     except tarfile.TarError:
@@ -647,13 +663,13 @@ def list_docker_images() -> list[str]:
 
 
 def scan_docker(
-    images: list[str], pkg: str, bad_version: str | None, *, auto_pull: bool = True,
+    images: list[str], targets: list[Target], *, auto_pull: bool = True,
 ) -> list[Finding]:
     _tprint(f"  {dim(f'{len(images)} image(s)')}")
     findings: list[Finding] = []
     with ThreadPoolExecutor(max_workers=MAX_IMAGE_WORKERS) as pool:
         futures = {
-            pool.submit(_scan_single_image, img, pkg, bad_version, auto_pull=auto_pull): img
+            pool.submit(_scan_single_image, img, targets, auto_pull=auto_pull): img
             for img in images
         }
         for future in as_completed(futures):
@@ -815,11 +831,8 @@ def main() -> None:
     all_images = _collect_images(args)
 
     if all_images:
-        for target in targets:
-            print_header(f"  IMAGES — {target.label}")
-            all_findings.extend(
-                scan_docker(all_images, target.name, target.version, auto_pull=auto_pull),
-            )
+        print_header("  IMAGES")
+        all_findings.extend(scan_docker(all_images, targets, auto_pull=auto_pull))
 
     infected = [f for f in all_findings if f.status == "found"]
     pinned = [f for f in all_findings if f.status == "pinned"]
