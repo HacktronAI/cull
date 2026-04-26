@@ -1,0 +1,18 @@
+FROM python:3.12-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git openssh-client \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash sandbox
+USER sandbox
+WORKDIR /home/sandbox
+ENV PATH="/home/sandbox/.local/bin:${PATH}"
+
+RUN mkdir -p ~/.ssh \
+ && ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+COPY --chown=sandbox:sandbox . /home/sandbox/cull
+RUN pip install --no-cache-dir --user /home/sandbox/cull
+
+ENTRYPOINT ["bash"]

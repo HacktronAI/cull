@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "updated": "2026-04-25",
+  "items": [
+    {"id": "credential_files", "indicator": "credential_theft", "value": "reads credential files such as .npmrc, .git-credentials, cloud credentials, kube config, SSH keys, browser profiles, wallet files", "description": "package code should rarely inspect user credential stores"},
+    {"id": "credential_env", "indicator": "credential_theft", "value": "enumerates or exfiltrates environment variables containing API keys, tokens, cloud credentials, or LLM provider keys", "description": "bulk env/key harvesting"},
+    {"id": "cloud_metadata", "indicator": "credential_theft", "value": "contacts cloud metadata services such as 169.254.169.254", "description": "attempt to obtain instance credentials"},
+    {"id": "network_exfil", "indicator": "network_exfil", "value": "sends files, env vars, tokens, system info, or scan results to an external HTTP endpoint, webhook, paste site, raw IP, or newly created repo", "description": "data theft"},
+    {"id": "network_download_execute", "indicator": "network_download", "value": "downloads remote code or binaries and then evals, imports, writes, chmods, or executes them", "description": "two-stage payload"},
+    {"id": "dynamic_execution", "indicator": "eval_dynamic", "value": "executes dynamically decoded strings using eval, Function, vm, exec, compile, import-from-string, or equivalent", "description": "runtime code execution"},
+    {"id": "obfuscation", "indicator": "obfuscation", "value": "hides behavior using base64/hex/charcode arrays, XOR loops, packed/minified payloads, or opaque string construction", "description": "concealed intent"},
+    {"id": "process_spawn", "indicator": "process_spawn", "value": "spawns shell commands or tools such as curl, wget, bash, sh, powershell, nc, python, node, chmod, or system package managers", "description": "unexpected process execution"},
+    {"id": "install_hook", "indicator": "install_hook", "value": "uses install-time or startup execution such as npm preinstall/install/postinstall, setup.py side effects, .pth import lines, or Python import-time side effects", "description": "code runs without normal app invocation"},
+    {"id": "persistence", "indicator": "persistence", "value": "creates cron jobs, startup services, shell profile hooks, GitHub Actions workflows, self-hosted runners, or registry/system launch entries", "description": "survives after install"},
+    {"id": "worm_propagation", "indicator": "worm_propagation", "value": "uses package-manager tokens to enumerate maintainer packages and publish or upload modified packages", "description": "self-propagating supply-chain behavior"},
+    {"id": "destructive_payload", "indicator": "destructive_payload", "value": "deletes home directories, wipes files/devices, encrypts data, or triggers destructive fallback behavior", "description": "wiper or dead-man-switch behavior"}
+  ]
+}

@@ -1,3 +1,5 @@
+.git
+.github
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -7,5 +9,5 @@ venv/
 build/
 dist/
 samples/
-out/
 .env
+**/.env

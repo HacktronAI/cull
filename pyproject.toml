@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hacktron-cull"
-version = "0.1.0"
-description = "Find compromised npm packages across your infrastructure."
+version = "0.2.0"
+description = "Find compromised packages and suspicious package code."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "Proprietary" }
 authors = [
   { name = "Hacktron" }
 ]
-keywords = ["security", "npm", "scanner", "docker", "github", "gcp"]
+keywords = ["security", "npm", "python", "scanner", "docker", "github", "gcp", "llm"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
@@ -24,4 +24,7 @@ classifiers = [
 cull = "cull:main"
 
 [tool.setuptools]
-packages = ["cull"]
+packages = ["cull", "cull.check", "cull.llm"]
+
+[tool.setuptools.package-data]
+"cull.llm" = ["iocs.json", "pricing.json"]
