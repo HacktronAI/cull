@@ -22,7 +22,6 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--api-key-env", default="GEMINI_API_KEY")
     parser.add_argument("--concurrency", type=int, default=8)
-    parser.add_argument("--max-files-per-pkg", type=int, default=200)
     parser.add_argument("--chunk-tokens", type=int, default=4000)
     parser.add_argument("--chunk-overlap-tokens", type=int, default=600)
     parser.add_argument("--include-tests", action="store_true")
@@ -40,7 +39,6 @@ def run(args: argparse.Namespace) -> NoReturn:
         include_tests=args.include_tests,
         no_cache=args.no_cache,
         concurrency=max(1, args.concurrency),
-        max_files_per_pkg=max(1, args.max_files_per_pkg),
         chunk_tokens=max(1, args.chunk_tokens),
         chunk_overlap_tokens=max(0, args.chunk_overlap_tokens),
         budget_usd=args.budget_usd,
@@ -121,7 +119,7 @@ def _print_summary(packages: list[PackageReport], cost: dict[str, int | float | 
     tprint()
     for package in [*malicious, *suspicious][:10]:
         color = red if package.verdict.level == "malicious" else yellow
-        tprint(color(f"▸ {package.package}@{package.version} ({package.ecosystem}) — {package.verdict.level}"))
+        tprint(color(f"▸ {package.package}@{package.version} — {package.verdict.level}"))
         for file in [item for item in package.files if item.verdict.level != "clean"][:3]:
             tprint(f"  {file.verdict.level}  {file.file.rel_path} ({file.verdict.confidence})")
             for finding in file.verdict.findings[:2]:
@@ -165,7 +163,7 @@ def _markdown_report(packages: list[PackageReport], cost: dict[str, int | float 
     for package in packages:
         if package.verdict.level == "clean":
             continue
-        lines.append(f"## {package.package}@{package.version} ({package.ecosystem}) — {package.verdict.level}")
+        lines.append(f"## {package.package}@{package.version} — {package.verdict.level}")
         lines.append("")
         for file in package.files:
             if file.verdict.level == "clean":

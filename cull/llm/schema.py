@@ -7,7 +7,6 @@ from typing import Any, Literal
 
 Level = Literal["clean", "suspicious", "malicious", "error"]
 Confidence = Literal["low", "medium", "high"]
-Ecosystem = Literal["npm", "python"]
 
 INDICATORS = {
     "obfuscation",
@@ -33,7 +32,6 @@ CONFIDENCE_SEVERITY: dict[Confidence, int] = {"low": 0, "medium": 1, "high": 2}
 
 @dataclass(frozen=True)
 class PackageFile:
-    ecosystem: Ecosystem
     package: str
     version: str
     package_root: Path
@@ -78,7 +76,6 @@ class FileReport:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "ecosystem": self.file.ecosystem,
             "package": self.file.package,
             "version": self.file.version,
             "path": str(self.file.rel_path),
@@ -91,7 +88,6 @@ class FileReport:
 
 @dataclass(frozen=True)
 class PackageReport:
-    ecosystem: Ecosystem
     package: str
     version: str
     files: list[FileReport]
@@ -99,7 +95,6 @@ class PackageReport:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "ecosystem": self.ecosystem,
             "package": self.package,
             "version": self.version,
             "verdict": self.verdict.to_dict(),

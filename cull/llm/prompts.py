@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-PROMPT_VERSION = "2026-04-26.1"
+PROMPT_VERSION = "2026-04-27.1"
 
 SYSTEM_PROMPT = """You are cull, a defensive malware scanner for npm and Python packages.
 
@@ -25,7 +25,6 @@ Rules:
 """
 
 USER_PROMPT_TEMPLATE = """Package: {package}@{version}
-Ecosystem: {ecosystem}
 File: {path}
 Chunk: {chunk_index}/{chunk_count}
 
@@ -43,7 +42,6 @@ def build_user_prompt(
     *,
     package: str,
     version: str,
-    ecosystem: str,
     path: str,
     chunk_index: int,
     chunk_count: int,
@@ -52,7 +50,6 @@ def build_user_prompt(
     return USER_PROMPT_TEMPLATE.format(
         package=package,
         version=version,
-        ecosystem=ecosystem,
         path=path,
         chunk_index=chunk_index,
         chunk_count=chunk_count,

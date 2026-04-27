@@ -109,7 +109,6 @@ class FilterTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
         return PackageFile(
-            ecosystem="npm",
             package="demo",
             version="1.0.0",
             package_root=root,
@@ -248,7 +247,6 @@ class DiscoverAndEstimateTests(unittest.TestCase):
                 include_tests=False,
                 no_cache=True,
                 concurrency=1,
-                max_files_per_pkg=200,
                 chunk_tokens=4000,
                 chunk_overlap_tokens=600,
                 progress=False,
@@ -261,6 +259,23 @@ class DiscoverAndEstimateTests(unittest.TestCase):
             self.assertEqual(result.file_count, 2)
             self.assertEqual(result.chunk_count, 2)
             self.assertIsNotNone(result.estimated_cost_usd)
+
+    def test_dir_mode_falls_back_for_unrecognized_folders(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "myproj"
+            (root / "src").mkdir(parents=True)
+            (root / ".git").mkdir()
+            (root / ".git" / "config").write_text("[core]\n", encoding="utf-8")
+            (root / "src" / "main.js").write_text("console.log('hi')\n", encoding="utf-8")
+            (root / "src" / "lib.py").write_text("print('hi')\n", encoding="utf-8")
+            (root / "README.md").write_text("# hi\n", encoding="utf-8")
+
+            files, errors = discover([str(root)])
+            self.assertFalse(errors)
+            self.assertTrue(files)
+            self.assertTrue(all(file.package == "myproj" for file in files))
+            # .git is pure metadata: skipped at walk time, not at filter time.
+            self.assertFalse(any(".git" in file.rel_path.parts for file in files))
 
 
 if __name__ == "__main__":

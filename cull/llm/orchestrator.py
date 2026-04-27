@@ -5,7 +5,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
 from .cache import VerdictCache, cache_key
 from .chunker import Chunk, chunk_text
@@ -14,7 +13,7 @@ from .discover import discover
 from .filter import read_text, should_scan
 from .pricing import RunCost, cost_for, estimate_tokens
 from .prompts import PROMPT_VERSION, SYSTEM_PROMPT, build_user_prompt
-from .schema import Ecosystem, Estimate, FileReport, PackageFile, PackageReport, Verdict, error_verdict, merge_verdicts
+from .schema import Estimate, FileReport, PackageFile, PackageReport, Verdict, error_verdict, merge_verdicts
 
 # Per-chunk output budget assumed when projecting cost or when a provider does
 # not return usage. ~180 tokens covers the JSON envelope plus 1-3 findings.
@@ -26,7 +25,6 @@ class ScanOptions:
     include_tests: bool
     no_cache: bool
     concurrency: int
-    max_files_per_pkg: int
     chunk_tokens: int
     chunk_overlap_tokens: int
     budget_usd: float | None = None
@@ -65,7 +63,6 @@ def prepare(paths: list[str], options: ScanOptions) -> PreparedFiles:
     files: list[PackageFile] = []
     skipped = 0
     seen_real_paths: set[Path] = set()
-    per_package_count: dict[tuple[str, str, str], int] = {}
 
     for file in discovered:
         if file.real_path in seen_real_paths:
@@ -79,14 +76,7 @@ def prepare(paths: list[str], options: ScanOptions) -> PreparedFiles:
                 errors.append(f"{file.abs_path}: {reason}")
             continue
 
-        package_key = (file.ecosystem, file.package, file.version)
-        current_count = per_package_count.get(package_key, 0)
-        if current_count >= options.max_files_per_pkg:
-            skipped += 1
-            continue
-
         seen_real_paths.add(file.real_path)
-        per_package_count[package_key] = current_count + 1
         files.append(file)
 
     return PreparedFiles(files, skipped, errors)
@@ -96,7 +86,7 @@ def estimate(files: list[PackageFile], *, model: str, options: ScanOptions, skip
     input_tokens = 0
     output_tokens = 0
     chunk_count = 0
-    packages = {(file.ecosystem, file.package, file.version) for file in files}
+    packages = {(file.package, file.version) for file in files}
 
     for file in files:
         try:
@@ -227,7 +217,6 @@ def _prompt(file: PackageFile, chunk: Chunk) -> str:
     return build_user_prompt(
         package=file.package,
         version=file.version,
-        ecosystem=file.ecosystem,
         path=str(file.rel_path),
         chunk_index=chunk.index,
         chunk_count=chunk.total,
@@ -236,24 +225,23 @@ def _prompt(file: PackageFile, chunk: Chunk) -> str:
 
 
 def _package_reports(files: list[FileReport]) -> list[PackageReport]:
-    grouped: dict[tuple[str, str, str], list[FileReport]] = {}
+    grouped: dict[tuple[str, str], list[FileReport]] = {}
     for file in files:
-        key = (file.file.ecosystem, file.file.package, file.file.version)
+        key = (file.file.package, file.file.version)
         grouped.setdefault(key, []).append(file)
 
     reports: list[PackageReport] = []
-    for (ecosystem, package, version), file_reports in grouped.items():
+    for (package, version), file_reports in grouped.items():
         verdict = merge_verdicts([file.verdict for file in file_reports])
         reports.append(
             PackageReport(
-                ecosystem=cast("Ecosystem", ecosystem),
                 package=package,
                 version=version,
                 files=file_reports,
                 verdict=verdict,
             )
         )
-    return sorted(reports, key=lambda report: (report.ecosystem, report.package, report.version))
+    return sorted(reports, key=lambda report: (report.package, report.version))
 
 
 class Progress:

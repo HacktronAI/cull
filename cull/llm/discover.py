@@ -4,11 +4,17 @@ import importlib.metadata
 import json
 import os
 from pathlib import Path
-from typing import cast
 
-from .schema import Ecosystem, PackageFile
+from .schema import PackageFile
 
-SKIP_DIRS = {".git", ".hg", ".svn", ".cache", "__pycache__", ".pytest_cache"}
+# Pure-metadata directories with no scannable source. We do NOT skip dependency
+# dirs (.venv, node_modules, …) — malware lives in those by design and that is
+# precisely what cull is for.
+SKIP_DIRS = {
+    ".git", ".hg", ".svn",
+    "__pycache__",
+    ".cache", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox",
+}
 
 
 def discover(paths: list[str]) -> tuple[list[PackageFile], list[str]]:
@@ -22,18 +28,13 @@ def discover(paths: list[str]) -> tuple[list[PackageFile], list[str]]:
             errors.append(f"{raw_path}: not a directory")
             continue
 
-        matched = False
         if _looks_like_node_modules(root):
-            matched = True
             for node_modules in _node_modules_dirs(root):
                 files.extend(_discover_npm(node_modules, seen_roots))
-
-        if _looks_like_site_packages(root):
-            matched = True
+        elif _looks_like_site_packages(root):
             files.extend(_discover_python(root))
-
-        if not matched:
-            errors.append(f"{raw_path}: does not look like node_modules or site-packages")
+        else:
+            files.extend(_discover_dir(root))
 
     return files, errors
 
@@ -77,8 +78,9 @@ def _discover_npm(node_modules: Path, seen_roots: set[Path]) -> list[PackageFile
         seen_roots.add(real_root)
 
         package, version = _read_package_json(package_root)
-        for path in _walk_files(package_root):
-            files.append(_package_file("npm", package, version, package_root, path))
+        # Skip nested node_modules: they're enumerated separately by _node_modules_dirs.
+        for path in _walk_files(package_root, skip=SKIP_DIRS | {"node_modules"}):
+            files.append(_package_file(package, version, package_root, path))
     return files
 
 
@@ -112,19 +114,23 @@ def _discover_python(site_packages: Path) -> list[PackageFile]:
             if real in seen:
                 continue
             seen.add(real)
-            files.append(_package_file("python", name, version, site_packages, path))
+            files.append(_package_file(name, version, site_packages, path))
 
     for path in site_packages.glob("*.pth"):
         if path.is_file() and not path.is_symlink():
-            files.append(_package_file("python", f"pth:{path.stem}", "unknown", site_packages, path))
+            files.append(_package_file(f"pth:{path.stem}", "unknown", site_packages, path))
 
     return files
 
 
-def _walk_files(root: Path) -> list[Path]:
+def _discover_dir(root: Path) -> list[PackageFile]:
+    return [_package_file(root.name, "unknown", root, path) for path in _walk_files(root)]
+
+
+def _walk_files(root: Path, *, skip: set[str] = SKIP_DIRS) -> list[Path]:
     paths: list[Path] = []
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-        dirnames[:] = [name for name in dirnames if name not in SKIP_DIRS and name != "node_modules"]
+        dirnames[:] = [name for name in dirnames if name not in skip]
         current = Path(dirpath)
         for filename in filenames:
             path = current / filename
@@ -133,9 +139,8 @@ def _walk_files(root: Path) -> list[Path]:
     return paths
 
 
-def _package_file(ecosystem: str, package: str, version: str, root: Path, path: Path) -> PackageFile:
+def _package_file(package: str, version: str, root: Path, path: Path) -> PackageFile:
     return PackageFile(
-        ecosystem=cast(Ecosystem, ecosystem),
         package=package,
         version=version,
         package_root=root,

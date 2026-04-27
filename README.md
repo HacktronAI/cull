@@ -37,12 +37,13 @@ LLM-scan installed package source files for suspicious supply-chain behavior.
 
 ```bash
 export GEMINI_API_KEY=...
-cull scan ./node_modules
-cull scan ./.venv/lib/python3.12/site-packages
+cull scan ./node_modules                              # npm install dir
+cull scan ./.venv/lib/python3.12/site-packages         # python install dir
+cull scan ./my-package                                 # any folder of source code
 cull scan ./node_modules ./.venv/lib/python3.12/site-packages -o report.json
 ```
 
-`PATH` must point at a package install directory: `node_modules`, `site-packages`, or a directory that clearly looks like one.
+`cull scan` auto-detects `node_modules` and `site-packages` layouts; anything else is scanned as a single anonymous folder. Pure-metadata dirs (`.git`, `__pycache__`, lint caches) are skipped at walk time. Dependency dirs (`.venv`, nested `node_modules`) are *not* — that is exactly the attack surface this tool is for. Use `--estimate-only` first to see how big the scan will be.
 
 Every run prints a preflight estimate first:
 
